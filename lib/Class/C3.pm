@@ -4,47 +4,137 @@ package Class::C3;
 use strict;
 use warnings;
 
-our $VERSION = '0.01';
-
 use Scalar::Util 'blessed';
 
+our $VERSION = '0.02';
+
+# this is our global stash of both 
+# MRO's and method dispatch tables
+# the structure basically looks like
+# this:
+#
+#   $MRO{$class} = {
+#      MRO => [ <class precendence list> ],
+#      methods => {
+#          orig => <original location of method>,
+#          code => \&<ref to original method>
+#      }
+#   }
+#
 my %MRO;
+
+# use these for debugging ...
+sub _dump_MRO_table { %MRO }
+our $TURN_OFF_C3 = 0;
 
 sub import {
     my $class = caller();
+    # skip if the caller is main::
+    # since that is clearly not relevant
     return if $class eq 'main';
+    return if $TURN_OFF_C3;
+    # make a note to calculate $class 
+    # during INIT phase
     $MRO{$class} = undef;
 }
 
-INIT {
-    no strict 'refs';    
+## initializers
+
+# NOTE:
+# this will not run under the following
+# conditions:
+#  - mod_perl
+#  - require Class::C3;
+#  - eval "use Class::C3"
+# in all those cases, you need to call 
+# the initialize() function manually
+INIT { initialize() }
+
+sub initialize {
+    # why bother if we don't have anything ...
+    return unless keys %MRO;
+    _calculate_method_dispatch_tables();
+    _apply_method_dispatch_tables();
+}
+
+sub uninitialize {
+    # why bother if we don't have anything ...
+    return unless keys %MRO;    
+    _remove_method_dispatch_tables();    
+}
+
+sub reinitialize {
+    uninitialize();
+    # clean up the %MRO before we re-initialize
+    $MRO{$_} = undef foreach keys %MRO;
+    initialize();
+}
+
+## functions for applying C3 to classes
+
+sub _calculate_method_dispatch_tables {
     foreach my $class (keys %MRO) {
-        my @MRO = calculateMRO($class);
-        $MRO{$class} = { MRO => \@MRO };
-        my %methods;
-        foreach my $local (@MRO[1 .. $#MRO]) {
-            foreach my $method (grep { defined &{"${local}::$_"} } keys %{"${local}::"}) {
-                next unless !defined *{"${class}::$method"}{CODE};
-                if (!exists $methods{$method}) {
-                    $methods{$method} = {
-                        orig => "${local}::$method",
-                        code => \&{"${local}::$method"}
-                    };
-                }
-            }
-        }    
-        $MRO{$class}->{methods} = \%methods;
+        _calculate_method_dispatch_table($class);
     }
-    #use Data::Dumper; warn Dumper \%MRO; 
-    foreach my $class (keys %MRO) {
-        #warn "installing methods (" . (join ", " => keys %{$MRO{$class}->{methods}}) . ") for $class";
-        foreach my $method (keys %{$MRO{$class}->{methods}}) {
-            #warn "Installing ${class}::$method using " . $MRO{$class}->{methods}->{$method}->{orig};
-            *{"${class}::$method"} = $MRO{$class}->{methods}->{$method}->{code};
+}
+
+sub _calculate_method_dispatch_table {
+    my $class = shift;
+    no strict 'refs';
+    my @MRO = calculateMRO($class);
+    $MRO{$class} = { MRO => \@MRO };
+    my %methods;
+    # NOTE: 
+    # we do @MRO[1 .. $#MRO] here because it
+    # makes no sense to interogate the class
+    # which you are calculating for. 
+    foreach my $local (@MRO[1 .. $#MRO]) {
+        foreach my $method (grep { defined &{"${local}::$_"} } keys %{"${local}::"}) {
+            # skip if already overriden in local class
+            next unless !defined *{"${class}::$method"}{CODE};
+            $methods{$method} = {
+                orig => "${local}::$method",
+                code => \&{"${local}::$method"}
+            } unless exists $methods{$method};
         }
+    }    
+    # now stash them in our %MRO table
+    $MRO{$class}->{methods} = \%methods;    
+}
+
+sub _apply_method_dispatch_tables {
+    foreach my $class (keys %MRO) {
+        _apply_method_dispatch_table($class);
+    }     
+}
+
+sub _apply_method_dispatch_table {
+    my $class = shift;
+    no strict 'refs';
+    foreach my $method (keys %{$MRO{$class}->{methods}}) {
+        *{"${class}::$method"} = $MRO{$class}->{methods}->{$method}->{code};
+    }    
+}
+
+sub _remove_method_dispatch_tables {
+    foreach my $class (keys %MRO) {
+        _remove_method_dispatch_table($class);
+    }       
+}
+
+sub _remove_method_dispatch_table {
+    my $class = shift;
+    no strict 'refs';
+    foreach my $method (keys %{$MRO{$class}->{methods}}) {
+        delete ${"${class}::"}{$method};
     }   
 }
 
+## functions for calculating C3 MRO
+
+# this function is a perl-port of the 
+# python code on this page:
+#   http://www.python.org/2.3/mro.html
 sub _merge {                
     my (@seqs) = @_;
     my @res; 
@@ -120,11 +210,11 @@ Class::C3 - A pragma to use the C3 method resolution order algortihm
     use Class::C3;    
 
     # Classic Diamond MI pattern
-    #    [ A ]
-    #   /     \
-    # [ B ]  [ C ]
-    #   \     /
-    #    [ D ]
+    #    <A>
+    #   /   \
+    # <B>   <C>
+    #   \   /
+    #    <D>
 
     package main;
 
@@ -154,11 +244,11 @@ default MRO for Parrot objects as well.
 C3 works by always preserving local precendence ordering. This essentially means that no class will 
 appear before any of it's subclasses. Take the classic diamond inheritence pattern for instance:
 
-    [ A ]
-   /     \
- [ B ]  [ C ]
-   \     /
-    [ D ]
+     <A>
+    /   \
+  <B>   <C>
+    \   /
+     <D>
 
 The standard Perl 5 MRO would be (D, B, A, C). The result being that B<A> appears before B<C>, even 
 though B<C> is the subclass of B<A>. The C3 MRO algorithm however, produces the following MRO 
@@ -179,6 +269,22 @@ The end result is actually classes with pre-cached method dispatch. However, thi
 do well if you start changing your C<@ISA> or messing with class symbol tables, so you should consider
 your classes to be effectively closed. See the L<CAVEATS> section for more details.
 
+=head1 OPTIONAL LOWERCASE PRAGMA
+
+This release also includes an optional module B<c3> in the F<opt/> folder. I did not include this in 
+the regular install since lowercase module names are considered I<"bad"> by some people. However I
+think that code looks much nicer like this:
+
+  package MyClass;
+  use c3;
+  
+The the more clunky:
+
+  package MyClass;
+  use Class::C3;
+  
+But hey, it's your choice, thats why it is optional.
+
 =head1 FUNCTIONS
 
 =over 4
@@ -186,6 +292,27 @@ your classes to be effectively closed. See the L<CAVEATS> section for more detai
 =item B<calculateMRO ($class)>
 
 Given a C<$class> this will return an array of class names in the proper C3 method resolution order.
+
+=item B<initialize>
+
+This can be used to initalize the C3 method dispatch tables. You need to call this if you are running
+under mod_perl, or in any other environment which does not run the INIT phase of the perl compiler.
+
+NOTE: 
+This can B<not> be used to re-load the dispatch tables for all classes. Use C<reinitialize> for that.
+
+=item B<uninitialize>
+
+Calling this function results in the removal of all cached methods, and the restoration of the old Perl 5
+style dispatch order (depth-first, left-to-right). 
+
+=item B<reinitialize>
+
+This effectively calls C<uninitialize> followed by C<initialize> the result of which is a reloading of
+B<all> the calculated C3 dispatch tables. 
+
+It should be noted that if you have a large class library, this could potentially be a rather costly 
+operation.
 
 =back
 
@@ -212,19 +339,16 @@ next most appropriate method in the MRO.
 
 It is the author's opinion that changing C<@ISA> at runtime is pure insanity anyway. However, people
 do it, so I must caveat. Any changes to the C<@ISA> will not be reflected in the MRO calculated by this
-module, and therefor probably won't even show up. I am considering some kind of C<recalculateMRO> function
-which can be used to recalculate the MRO on demand at runtime, but that is still off in the future.
+module, and therefor probably won't even show up. If you do this, you will need to call C<reinitialize> 
+in order to recalulate B<all> method dispatch tables. See the C<reinitialize> documentation and an example
+in F<t/20_reinitialize.t> for more information.
 
 =item Adding/deleting methods from class symbol tables.
 
 This module calculates the MRO for each requested class during the INIT phase by interogatting the symbol
 tables of said classes. So any symbol table manipulation which takes place after our INIT phase is run will
-not be reflected in the calculated MRO.
-
-=item Not for use with mod_perl
-
-Since this module utilizes the INIT phase, it cannot be easily used with mod_perl. If this module works out
-and proves useful in the I<real world>, I will most likely be supporting mod_perl in some way.
+not be reflected in the calculated MRO. Just as with changing the C<@ISA>, you will need to call 
+C<reinitialize> for any changes you make to take effect.
 
 =back
 
@@ -236,18 +360,10 @@ and proves useful in the I<real world>, I will most likely be supporting mod_per
 
 You can never have enough tests :)
 
-I need to convert the other MRO and class-precendence-list related tests from the Perl6-MetaModel (see link
-in L<SEE ALSO>). In addition, I need to add some method checks to these tests as well.
-
 =item call-next-method / NEXT:: / next METHOD
 
 I am contemplating some kind of psudeo-package which can dispatch to the next most relevant method in the 
 MRO. This should not be too hard to implement when the time comes.
-
-=item recalculateMRO
-
-This being Perl, it would be remiss of me to force people to close thier classes at runtime. So I need to 
-develop a means for recalculating the MRO for a given class. 
 
 =back
 
@@ -299,7 +415,7 @@ develop a means for recalculating the MRO for a given class.
 
 =head1 AUTHOR
 
-stevan little, E<lt>stevan@iinteractive.comE<gt>
+Stevan Little, E<lt>stevan@iinteractive.comE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
