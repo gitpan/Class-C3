@@ -6,7 +6,7 @@ use warnings;
 
 use Scalar::Util 'blessed';
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 # this is our global stash of both 
 # MRO's and method dispatch tables
@@ -179,6 +179,38 @@ sub calculateMRO {
     );
 }
 
+package NEXT::METHOD; 
+
+use strict;
+use warnings;
+
+use Scalar::Util 'blessed';
+
+our $VERSION = '0.01';
+
+sub AUTOLOAD {
+    my @autoload = (split '::', our $AUTOLOAD);
+    my $label    = $autoload[-1];    
+    my $self     = $_[0];
+    my $caller   = caller;
+    my $class    = blessed($self) || $self;
+    
+    my @MRO = Class::C3::calculateMRO($class);
+    
+    my $current;
+    while ($current = shift @MRO) {
+        last if $caller eq $current;
+    }
+    
+    no strict 'refs';
+    foreach my $class (@MRO) {
+        goto &{$class . '::' . $label} 
+            if defined &{$class . '::' . $label};
+    }
+    
+    die "No NEXT::METHOD::$label found for $self";
+}
+
 1;
 
 __END__
@@ -316,6 +348,40 @@ operation.
 
 =back
 
+=head1 METHOD REDISPATCHING
+
+It is always useful to be able to re-dispatch your method call to the "next most applicable method". This 
+module provides a pseudo package along the lines of C<SUPER::> or C<NEXT::> which will re-dispatch the 
+method along the C3 linearization. This is best show with an examples.
+
+  # a classic diamond MI pattern ...
+     <A>
+    /   \
+  <B>   <C>
+    \   /
+     <D>
+  
+  package A;
+  use c3; 
+  sub foo { 'A::foo' }       
+ 
+  package B;
+  use base 'A'; 
+  use c3;     
+  sub foo { 'B::foo => ' . (shift)->NEXT::METHOD::foo() }       
+ 
+  package B;
+  use base 'A'; 
+  use c3;    
+  sub foo { 'C::foo => ' . (shift)->NEXT::METHOD::foo() }   
+ 
+  package D;
+  use base ('B', 'C'); 
+  use c3; 
+  sub foo { 'D::foo => ' . (shift)->NEXT::METHOD::foo() }   
+  
+  print D->foo; # prints out "D::foo => B::foo => C::foo => A::foo"
+
 =head1 CAVEATS
 
 Let me first say, this is an experimental module, and so it should not be used for anything other 
@@ -332,8 +398,8 @@ And now, onto the caveats.
 
 The idea of C<SUPER::> under multiple inheritence is ambigious, and generally not recomended anyway.
 However, it's use in conjuntion with this module is very much not recommended, and in fact very 
-discouraged. In the future I plan to support a C<NEXT::> style interface to be used to move to the 
-next most appropriate method in the MRO.
+discouraged. The recommended approach is to instead use the supplied pseudo-class C<NEXT::METHOD>, see
+more details on it's usage above.
 
 =item Changing C<@ISA>.
 
@@ -360,11 +426,6 @@ C<reinitialize> for any changes you make to take effect.
 
 You can never have enough tests :)
 
-=item call-next-method / NEXT:: / next METHOD
-
-I am contemplating some kind of psudeo-package which can dispatch to the next most relevant method in the 
-MRO. This should not be too hard to implement when the time comes.
-
 =back
 
 =head1 SEE ALSO
@@ -381,7 +442,7 @@ MRO. This should not be too hard to implement when the time comes.
 
 =over 4
 
-=item L<http://svn.openfoundry.org/pugs/perl5/Perl6-MetaModel/>
+=item L<http://svn.openfoundry.org/pugs/perl5/Perl6-MetaModel2.0/>
 
 =back
 

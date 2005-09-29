@@ -1,5 +1,10 @@
 Revision history for Perl extension Class::C3.
 
+0.03 - Wed, Sept 28, 2005
+    - added the NEXT::METHOD psuedo package for method
+      redispatching along the C3 linearization
+        - added test for this
+
 0.02 - Mon, Aug 8, 2005
     - code refactoring
         - many comments added
