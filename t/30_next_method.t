@@ -35,22 +35,22 @@ This tests the classic diamond inheritence pattern.
     package Diamond_B;
     use base 'Diamond_A';
     use c3;     
-    sub foo { 'Diamond_B::foo => ' . (shift)->NEXT::METHOD::foo() }       
+    sub foo { 'Diamond_B::foo => ' . (shift)->next::method() }       
 }
 {
     package Diamond_C;
     use c3;    
     use base 'Diamond_A';     
 
-    sub hello { 'Diamond_C::hello => ' . (shift)->NEXT::METHOD::hello() }
-    sub foo { 'Diamond_C::foo => ' . (shift)->NEXT::METHOD::foo() }   
+    sub hello { 'Diamond_C::hello => ' . (shift)->next::method() }
+    sub foo { 'Diamond_C::foo => ' . (shift)->next::method() }   
 }
 {
     package Diamond_D;
     use base ('Diamond_B', 'Diamond_C');
     use c3; 
     
-    sub foo { 'Diamond_D::foo => ' . (shift)->NEXT::METHOD::foo() }   
+    sub foo { 'Diamond_D::foo => ' . (shift)->next::method() }   
 }
 
 is_deeply(

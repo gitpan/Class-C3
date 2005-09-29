@@ -12,7 +12,8 @@ t/04_MRO.t
 t/05_MRO.t
 t/10_Inconsistent_hierarchy.t
 t/20_reinitialize.t
-t/30_NEXT_METHOD.t
+t/30_next_method.t
+t/31_next_method_skip.t
 t/pod.t
 t/pod_coverage.t
 t/lib/A.pm

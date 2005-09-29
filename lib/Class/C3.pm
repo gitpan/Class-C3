@@ -6,7 +6,7 @@ use warnings;
 
 use Scalar::Util 'blessed';
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 # this is our global stash of both 
 # MRO's and method dispatch tables
@@ -179,20 +179,20 @@ sub calculateMRO {
     );
 }
 
-package NEXT::METHOD; 
+package  # hide me from PAUSE
+    next; 
 
 use strict;
 use warnings;
 
 use Scalar::Util 'blessed';
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
-sub AUTOLOAD {
-    my @autoload = (split '::', our $AUTOLOAD);
-    my $label    = $autoload[-1];    
+sub method {
+    my $label   = (split '::', (caller(1))[3])[-1];
+    my $caller   = caller;    
     my $self     = $_[0];
-    my $caller   = caller;
     my $class    = blessed($self) || $self;
     
     my @MRO = Class::C3::calculateMRO($class);
@@ -208,7 +208,7 @@ sub AUTOLOAD {
             if defined &{$class . '::' . $label};
     }
     
-    die "No NEXT::METHOD::$label found for $self";
+    die "No next::method '$label' found for $self";
 }
 
 1;
@@ -368,19 +368,26 @@ method along the C3 linearization. This is best show with an examples.
   package B;
   use base 'A'; 
   use c3;     
-  sub foo { 'B::foo => ' . (shift)->NEXT::METHOD::foo() }       
+  sub foo { 'B::foo => ' . (shift)->next::method() }       
  
   package B;
   use base 'A'; 
   use c3;    
-  sub foo { 'C::foo => ' . (shift)->NEXT::METHOD::foo() }   
+  sub foo { 'C::foo => ' . (shift)->next::method() }   
  
   package D;
   use base ('B', 'C'); 
   use c3; 
-  sub foo { 'D::foo => ' . (shift)->NEXT::METHOD::foo() }   
+  sub foo { 'D::foo => ' . (shift)->next::method() }   
   
   print D->foo; # prints out "D::foo => B::foo => C::foo => A::foo"
+
+A few things to note. First, we do not require you to add on the method name to the C<next::method> 
+call (this is unlike C<NEXT::> and C<SUPER::> which do require that). This helps to enforce the rule 
+that you cannot dispatch to a method of a different name (this is how C<NEXT::> behaves as well). 
+
+The next thing to keep in mind is that you will need to pass all arguments to C<next::method> it can 
+not automatically use the current C<@_>. 
 
 =head1 CAVEATS
 
@@ -398,7 +405,7 @@ And now, onto the caveats.
 
 The idea of C<SUPER::> under multiple inheritence is ambigious, and generally not recomended anyway.
 However, it's use in conjuntion with this module is very much not recommended, and in fact very 
-discouraged. The recommended approach is to instead use the supplied pseudo-class C<NEXT::METHOD>, see
+discouraged. The recommended approach is to instead use the supplied C<next::method> feature, see
 more details on it's usage above.
 
 =item Changing C<@ISA>.
@@ -427,6 +434,18 @@ C<reinitialize> for any changes you make to take effect.
 You can never have enough tests :)
 
 =back
+
+=head1 CODE COVERAGE
+
+I use B<Devel::Cover> to test the code coverage of my tests, below is the B<Devel::Cover> report on this module's test suite.
+
+ ---------------------------- ------ ------ ------ ------ ------ ------ ------
+ File                           stmt   bran   cond    sub    pod   time  total
+ ---------------------------- ------ ------ ------ ------ ------ ------ ------
+ Class/C3.pm                    99.2   92.9   33.3   96.0  100.0  100.0   95.6
+ ---------------------------- ------ ------ ------ ------ ------ ------ ------
+ Total                          99.2   92.9   33.3   96.0  100.0  100.0   95.6
+ ---------------------------- ------ ------ ------ ------ ------ ------ ------
 
 =head1 SEE ALSO
 
