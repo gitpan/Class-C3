@@ -6,7 +6,7 @@ use warnings;
 
 use Scalar::Util 'blessed';
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 # this is our global stash of both 
 # MRO's and method dispatch tables
@@ -55,12 +55,14 @@ sub initialize {
     return unless keys %MRO;
     _calculate_method_dispatch_tables();
     _apply_method_dispatch_tables();
+    %next::METHOD_CACHE = ();
 }
 
 sub uninitialize {
     # why bother if we don't have anything ...
     return unless keys %MRO;    
     _remove_method_dispatch_tables();    
+    %next::METHOD_CACHE = ();
 }
 
 sub reinitialize {
@@ -187,28 +189,36 @@ use warnings;
 
 use Scalar::Util 'blessed';
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
+
+our %METHOD_CACHE;
 
 sub method {
-    my $label   = (split '::', (caller(1))[3])[-1];
-    my $caller   = caller;    
+    my @label    = (split '::', (caller(1))[3]);
+    my $label    = pop @label;
+    my $caller   = join '::' => @label;    
     my $self     = $_[0];
     my $class    = blessed($self) || $self;
     
-    my @MRO = Class::C3::calculateMRO($class);
-    
-    my $current;
-    while ($current = shift @MRO) {
-        last if $caller eq $current;
-    }
-    
-    no strict 'refs';
-    foreach my $class (@MRO) {
-        goto &{$class . '::' . $label} 
-            if defined &{$class . '::' . $label};
-    }
-    
-    die "No next::method '$label' found for $self";
+    goto &{ $METHOD_CACHE{"$class|$caller|$label"} ||= do {
+
+      my @MRO = Class::C3::calculateMRO($class);
+
+      my $current;
+      while ($current = shift @MRO) {
+          last if $caller eq $current;
+      }
+
+      no strict 'refs';
+      my $found;
+      foreach my $class (@MRO) {
+          last if (defined ($found = *{$class . '::' . $label}{CODE}));
+      }
+
+      die "No next::method '$label' found for $self" unless $found;
+
+      $found;
+    } };
 }
 
 1;
@@ -442,9 +452,9 @@ I use B<Devel::Cover> to test the code coverage of my tests, below is the B<Deve
  ---------------------------- ------ ------ ------ ------ ------ ------ ------
  File                           stmt   bran   cond    sub    pod   time  total
  ---------------------------- ------ ------ ------ ------ ------ ------ ------
- Class/C3.pm                    99.2   92.9   33.3   96.0  100.0  100.0   95.6
+ Class/C3.pm                    99.2   93.3   66.7   96.0  100.0   92.8   96.3
  ---------------------------- ------ ------ ------ ------ ------ ------ ------
- Total                          99.2   92.9   33.3   96.0  100.0  100.0   95.6
+ Total                          99.2   93.3   66.7   96.0  100.0   92.8   96.3
  ---------------------------- ------ ------ ------ ------ ------ ------ ------
 
 =head1 SEE ALSO
@@ -461,7 +471,7 @@ I use B<Devel::Cover> to test the code coverage of my tests, below is the B<Deve
 
 =over 4
 
-=item L<http://svn.openfoundry.org/pugs/perl5/Perl6-MetaModel2.0/>
+=item L<http://svn.openfoundry.org/pugs/perl5/Perl6-MetaModel/>
 
 =back
 
