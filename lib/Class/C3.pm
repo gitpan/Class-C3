@@ -6,7 +6,7 @@ use warnings;
 
 use Scalar::Util 'blessed';
 
-our $VERSION = '0.08';
+our $VERSION = '0.09';
 
 # this is our global stash of both 
 # MRO's and method dispatch tables
@@ -213,12 +213,14 @@ our %METHOD_CACHE;
 
 sub method {
     my $level = 1;
-    my $method_caller;
+    my ($method_caller, $label, @label);
     while ($method_caller = (caller($level++))[3]) {
-        last unless $method_caller eq '(eval)';
+      @label = (split '::', $method_caller);
+      $label = pop @label;
+      last unless
+        $label eq '(eval)' ||
+        $label eq '__ANON__';
     }
-    my @label    = (split '::', $method_caller);    
-    my $label    = pop @label;
     my $caller   = join '::' => @label;    
     my $self     = $_[0];
     my $class    = blessed($self) || $self;
@@ -528,6 +530,18 @@ module's test suite.
 =item L<http://www.call-with-current-continuation.org/eggs/c3.html>
 
 =back 
+
+=head1 ACKNOWLEGEMENTS
+
+=over 4
+
+=item Thanks to Matt S. Trout for using this module in his module L<DBIx::Class> 
+and finding many bugs and providing fixes.
+
+=item Thanks to Justin Guenther for making C<next::method> more robust by handling 
+calls inside C<eval> and anon-subs.
+
+=back
 
 =head1 AUTHOR
 
