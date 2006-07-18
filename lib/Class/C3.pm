@@ -7,7 +7,7 @@ use warnings;
 use Scalar::Util 'blessed';
 use Algorithm::C3;
 
-our $VERSION = '0.11';
+our $VERSION = '0.12';
 
 # this is our global stash of both 
 # MRO's and method dispatch tables
@@ -159,7 +159,9 @@ our $VERSION = '0.05';
 our %METHOD_CACHE;
 
 sub method {
-    my $level = 1;
+    my $indirect = caller() =~ /^(?:next|maybe::next)$/;
+    my $level = $indirect ? 2 : 1;
+     
     my ($method_caller, $label, @label);
     while ($method_caller = (caller($level++))[3]) {
       @label = (split '::', $method_caller);
@@ -172,28 +174,44 @@ sub method {
     my $self     = $_[0];
     my $class    = blessed($self) || $self;
     
-    goto &{ $METHOD_CACHE{"$class|$caller|$label"} ||= do {
+    my $method = $METHOD_CACHE{"$class|$caller|$label"} ||= do {
+        
+        my @MRO = Class::C3::calculateMRO($class);
+        
+        my $current;
+        while ($current = shift @MRO) {
+            last if $caller eq $current;
+        }
+        
+        no strict 'refs';
+        my $found;
+        foreach my $class (@MRO) {
+            next if (defined $Class::C3::MRO{$class} && 
+                     defined $Class::C3::MRO{$class}{methods}{$label});          
+            last if (defined ($found = *{$class . '::' . $label}{CODE}));
+        }
+        
+        $found;
+    };
 
-      my @MRO = Class::C3::calculateMRO($class);
+    return $method if $indirect;
 
-      my $current;
-      while ($current = shift @MRO) {
-          last if $caller eq $current;
-      }
+    die "No next::method '$label' found for $self" if !$method;
 
-      no strict 'refs';
-      my $found;
-      foreach my $class (@MRO) {
-          next if (defined $Class::C3::MRO{$class} && 
-                   defined $Class::C3::MRO{$class}{methods}{$label});          
-          last if (defined ($found = *{$class . '::' . $label}{CODE}));
-      }
-
-      die "No next::method '$label' found for $self" unless $found;
-
-      $found;
-    } };
+    goto &{$method};
 }
+
+sub can { method($_[0]) }
+
+package  # hide me from PAUSE
+    maybe::next; 
+
+use strict;
+use warnings;
+
+our $VERSION = '0.01';
+
+sub method { (next::method($_[0]) || return)->(@_) }
 
 1;
 
@@ -315,7 +333,21 @@ Given a C<$class> this will return an array of class names in the proper C3 meth
 =item B<initialize>
 
 This B<must be called> to initalize the C3 method dispatch tables, this module B<will not work> if 
-you do not do this. It is advised to do this as soon as possible B<after> any classes which use C3.
+you do not do this. It is advised to do this as soon as possible B<after> loading any classes which 
+use C3. Here is a quick code example:
+  
+  package Foo;
+  use Class::C3;
+  # ... Foo methods here
+  
+  package Bar;
+  use Class::C3;
+  use base 'Foo';
+  # ... Bar methods here
+  
+  package main;
+  
+  Class::C3::initialize(); # now it is safe to use Foo and Bar
 
 This function used to be called automatically for you in the INIT phase of the perl compiler, but 
 that lead to warnings if this module was required at runtime. After discussion with my user base 
@@ -382,6 +414,16 @@ that you cannot dispatch to a method of a different name (this is how C<NEXT::> 
 
 The next thing to keep in mind is that you will need to pass all arguments to C<next::method> it can 
 not automatically use the current C<@_>. 
+
+If C<next::method> cannot find a next method to re-dispatch the call to, it will throw an exception.
+You can use C<next::can> to see if C<next::method> will succeed before you call it like so:
+
+  $self->next::method(@_) if $self->next::can; 
+
+Additionally, you can use C<maybe::next::method> as a shortcut to only call the next method if it exists. 
+The previous example could be simply written as:
+
+  $self->maybe::next::method(@_);
 
 There are some caveats about using C<next::method>, see below for those.
 
@@ -509,6 +551,9 @@ and finding many bugs and providing fixes.
 
 =item Thanks to Justin Guenther for making C<next::method> more robust by handling 
 calls inside C<eval> and anon-subs.
+
+=item Thanks to Robert Norris for adding support for C<next::can> and 
+C<maybe::next::method>.
 
 =back
 
