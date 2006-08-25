@@ -30,3 +30,4 @@ t/lib/D.pm
 t/lib/E.pm
 t/lib/F.pm
 util/visualize_c3.pl
+META.yml                                 Module meta-data (added by MakeMaker)
