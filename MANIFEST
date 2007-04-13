@@ -1,7 +1,11 @@
 Build.PL
+c3.patch
 ChangeLog
 lib/Class/C3.pm
+lib/Class/C3/next.pm
+Makefile.PL
 MANIFEST			This list of files
+META.yml
 opt/c3.pm
 README
 t/00_load.t
@@ -31,5 +35,3 @@ t/lib/F.pm
 t/pod.t
 t/pod_coverage.t
 util/visualize_c3.pl
-Makefile.PL
-META.yml

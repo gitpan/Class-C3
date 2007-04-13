@@ -4,10 +4,25 @@ package Class::C3;
 use strict;
 use warnings;
 
-use Scalar::Util 'blessed';
-use Algorithm::C3;
+our $VERSION = '0.15_01';
 
-our $VERSION = '0.14';
+our $C3_IN_CORE;
+
+BEGIN {
+    eval "require mro"; # XXX in the future, this should be a version check
+    if($@) {
+        die $@ if $@ !~ /locate/;
+#        eval "require Class::C3::XS";
+#        if($@) {
+#            die $@ if $@ !~ /locate/;
+            eval "require Algorithm::C3; require Class::C3::next";
+            die $@ if $@;
+#        }
+    }
+    else {
+        $C3_IN_CORE = 1;
+    }
+}
 
 # this is our global stash of both 
 # MRO's and method dispatch tables
@@ -37,7 +52,10 @@ sub import {
     # skip if the caller is main::
     # since that is clearly not relevant
     return if $class eq 'main';
+
     return if $TURN_OFF_C3;
+    mro::set_mro($class, 'c3') if $C3_IN_CORE;
+
     # make a note to calculate $class 
     # during INIT phase
     $MRO{$class} = undef unless exists $MRO{$class};
@@ -46,24 +64,34 @@ sub import {
 ## initializers
 
 sub initialize {
+    %next::METHOD_CACHE = ();
     # why bother if we don't have anything ...
     return unless keys %MRO;
-    if($_initialized) {
-        uninitialize();
-        $MRO{$_} = undef foreach keys %MRO;
+    if($C3_IN_CORE) {
+        mro::set_mro($_, 'c3') for keys %MRO;
     }
-    _calculate_method_dispatch_tables();
-    _apply_method_dispatch_tables();
-    %next::METHOD_CACHE = ();
-    $_initialized = 1;
+    else {
+        if($_initialized) {
+            uninitialize();
+            $MRO{$_} = undef foreach keys %MRO;
+        }
+        _calculate_method_dispatch_tables();
+        _apply_method_dispatch_tables();
+        $_initialized = 1;
+    }
 }
 
 sub uninitialize {
     # why bother if we don't have anything ...
-    return unless keys %MRO;    
-    _remove_method_dispatch_tables();    
     %next::METHOD_CACHE = ();
-    $_initialized = 0;
+    return unless keys %MRO;    
+    if($C3_IN_CORE) {
+        mro::set_mro($_, 'dfs') for keys %MRO;
+    }
+    else {
+        _remove_method_dispatch_tables();    
+        $_initialized = 0;
+    }
 }
 
 sub reinitialize { goto &initialize }
@@ -71,6 +99,7 @@ sub reinitialize { goto &initialize }
 ## functions for applying C3 to classes
 
 sub _calculate_method_dispatch_tables {
+    return if $C3_IN_CORE;
     my %merge_cache;
     foreach my $class (keys %MRO) {
         _calculate_method_dispatch_table($class, \%merge_cache);
@@ -78,6 +107,7 @@ sub _calculate_method_dispatch_tables {
 }
 
 sub _calculate_method_dispatch_table {
+    return if $C3_IN_CORE;
     my ($class, $merge_cache) = @_;
     no strict 'refs';
     my @MRO = calculateMRO($class, $merge_cache);
@@ -109,12 +139,14 @@ sub _calculate_method_dispatch_table {
 }
 
 sub _apply_method_dispatch_tables {
+    return if $C3_IN_CORE;
     foreach my $class (keys %MRO) {
         _apply_method_dispatch_table($class);
     }     
 }
 
 sub _apply_method_dispatch_table {
+    return if $C3_IN_CORE;
     my $class = shift;
     no strict 'refs';
     ${"${class}::()"} = $MRO{$class}->{has_overload_fallback}
@@ -125,12 +157,14 @@ sub _apply_method_dispatch_table {
 }
 
 sub _remove_method_dispatch_tables {
+    return if $C3_IN_CORE;
     foreach my $class (keys %MRO) {
         _remove_method_dispatch_table($class);
     }       
 }
 
 sub _remove_method_dispatch_table {
+    return if $C3_IN_CORE;
     my $class = shift;
     no strict 'refs';
     delete ${"${class}::"}{"()"} if $MRO{$class}->{has_overload_fallback};    
@@ -141,82 +175,16 @@ sub _remove_method_dispatch_table {
     }   
 }
 
-## functions for calculating C3 MRO
-
 sub calculateMRO {
     my ($class, $merge_cache) = @_;
+
+    return @{mro::get_linear_isa($class)} if $C3_IN_CORE;
+
     return Algorithm::C3::merge($class, sub { 
         no strict 'refs'; 
         @{$_[0] . '::ISA'};
     }, $merge_cache);
 }
-
-package  # hide me from PAUSE
-    next; 
-
-use strict;
-use warnings;
-
-use Scalar::Util 'blessed';
-
-our $VERSION = '0.05';
-
-our %METHOD_CACHE;
-
-sub method {
-    my $indirect = caller() =~ /^(?:next|maybe::next)$/;
-    my $level = $indirect ? 2 : 1;
-     
-    my ($method_caller, $label, @label);
-    while ($method_caller = (caller($level++))[3]) {
-      @label = (split '::', $method_caller);
-      $label = pop @label;
-      last unless
-        $label eq '(eval)' ||
-        $label eq '__ANON__';
-    }
-    my $caller   = join '::' => @label;    
-    my $self     = $_[0];
-    my $class    = blessed($self) || $self;
-    
-    my $method = $METHOD_CACHE{"$class|$caller|$label"} ||= do {
-        
-        my @MRO = Class::C3::calculateMRO($class);
-        
-        my $current;
-        while ($current = shift @MRO) {
-            last if $caller eq $current;
-        }
-        
-        no strict 'refs';
-        my $found;
-        foreach my $class (@MRO) {
-            next if (defined $Class::C3::MRO{$class} && 
-                     defined $Class::C3::MRO{$class}{methods}{$label});          
-            last if (defined ($found = *{$class . '::' . $label}{CODE}));
-        }
-        
-        $found;
-    };
-
-    return $method if $indirect;
-
-    die "No next::method '$label' found for $self" if !$method;
-
-    goto &{$method};
-}
-
-sub can { method($_[0]) }
-
-package  # hide me from PAUSE
-    maybe::next; 
-
-use strict;
-use warnings;
-
-our $VERSION = '0.01';
-
-sub method { (next::method($_[0]) || return)->(@_) }
 
 1;
 
@@ -267,6 +235,19 @@ Class::C3 - A pragma to use the C3 method resolution order algortihm
     
     D->can('hello')->();          # can() also works correctly
     UNIVERSAL::can('D', 'hello'); # as does UNIVERSAL::can()
+
+=head1 SPECIAL NOTE FOR 0.15_01
+
+To try this with the experimental perl core c3 patch,
+download a recent copy perl-current:
+
+http://mirrors.develooper.com/perl/APC/perl-current-snap/perl-current@30943.tar.bz2
+
+apply the enclosed c3.patch, and install this perl:
+
+sh Configure -Dusedevel -Dprefix=/where/I/want/it -d -e && make && make test && make install
+
+then try your C3-using software against this perl + Class::C3 0.15_01.
 
 =head1 DESCRIPTION
 

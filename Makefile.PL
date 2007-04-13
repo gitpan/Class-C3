@@ -2,16 +2,15 @@
 use ExtUtils::MakeMaker;
 WriteMakefile
 (
+          'PL_FILES' => {},
+          'INSTALLDIRS' => 'site',
           'NAME' => 'Class::C3',
+          'EXE_FILES' => [],
           'VERSION_FROM' => 'lib/Class/C3.pm',
           'PREREQ_PM' => {
-                           'Algorithm::C3' => '0.05',
+                           'Test::More' => '0.47',
                            'Scalar::Util' => '1.1',
-                           'Test::Exception' => '0.15',
-                           'Test::More' => '0.47'
-                         },
-          'INSTALLDIRS' => 'site',
-          'EXE_FILES' => [],
-          'PL_FILES' => {}
+                           'Algorithm::C3' => '0.06'
+                         }
         )
 ;
