@@ -1,13 +1,11 @@
 ---
 name: Class-C3
-version: 0.15_02
+version: 0.15_03
 author:
   - 'Stevan Little, E<lt>stevan@iinteractive.comE<gt>'
   - 'Brandon L. Black, E<lt>blblack@gmail.comE<gt>'
 abstract: A pragma to use the C3 method resolution order algortihm
 license: perl
-resources:
-  license: http://dev.perl.org/licenses/
 requires:
   Algorithm::C3: 0.06
   Scalar::Util: 1.1
@@ -15,11 +13,13 @@ build_requires:
   Test::More: 0.47
 recommends:
   Class::C3::XS: 0.02
-provides:
-  Class::C3:
-    file: lib/Class/C3.pm
-    version: 0.15_02
 generated_by: Module::Build version 0.2807
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.2.html
   version: 1.2
+provides:
+  Class::C3:
+    file: lib/Class/C3.pm
+    version: 0.15_03
+resources:
+  license: http://dev.perl.org/licenses/
