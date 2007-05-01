@@ -4,25 +4,26 @@ package Class::C3;
 use strict;
 use warnings;
 
-our $VERSION = '0.15_05';
+our $VERSION = '0.15_06';
 
 our $C3_IN_CORE;
 our $C3_XS;
 
 BEGIN {
-    if($^V < 5.009005) {
-        eval "require Class::C3::XS";
-        if($@) {
-            die $@ if $@ !~ /locate/;
-            eval "require Algorithm::C3; require Class::C3::next";
-            die $@ if $@;
-        }
-        else {
-            $C3_XS = 1;
-        }
+    if($] > 5.009_004) {
+        $C3_IN_CORE = 1;
     }
     else {
-        $C3_IN_CORE = 1;
+        eval "require Class::C3::XS";
+        my $error = $@;
+        if(!$error) {
+            $C3_XS = 1;
+        }
+        else {
+            die $error if $error !~ /\blocate\b/;
+            require Algorithm::C3;
+            require Class::C3::next;
+        }
     }
 }
 
@@ -114,7 +115,7 @@ sub _calculate_method_dispatch_table {
     no strict 'refs';
     my @MRO = calculateMRO($class, $merge_cache);
     $MRO{$class} = { MRO => \@MRO };
-    my $has_overload_fallback = 0;
+    my $has_overload_fallback;
     my %methods;
     # NOTE: 
     # we do @MRO[1 .. $#MRO] here because it
@@ -125,7 +126,7 @@ sub _calculate_method_dispatch_table {
         # have use "fallback", then we want to
         # grab that value 
         $has_overload_fallback = ${"${local}::()"} 
-            if defined ${"${local}::()"};
+            if !defined $has_overload_fallback && defined ${"${local}::()"};
         foreach my $method (grep { defined &{"${local}::$_"} } keys %{"${local}::"}) {
             # skip if already overriden in local class
             next unless !defined *{"${class}::$method"}{CODE};
@@ -152,7 +153,8 @@ sub _apply_method_dispatch_table {
     my $class = shift;
     no strict 'refs';
     ${"${class}::()"} = $MRO{$class}->{has_overload_fallback}
-        if $MRO{$class}->{has_overload_fallback};
+        if !defined &{"${class}::()"}
+           && defined $MRO{$class}->{has_overload_fallback};
     foreach my $method (keys %{$MRO{$class}->{methods}}) {
         if ( $method =~ /^\(/ ) {
             my $orig = $MRO{$class}->{methods}->{$method}->{orig};
@@ -166,7 +168,7 @@ sub _remove_method_dispatch_tables {
     return if $C3_IN_CORE;
     foreach my $class (keys %MRO) {
         _remove_method_dispatch_table($class);
-    }       
+    }
 }
 
 sub _remove_method_dispatch_table {
@@ -178,7 +180,7 @@ sub _remove_method_dispatch_table {
         delete ${"${class}::"}{$method}
             if defined *{"${class}::${method}"}{CODE} && 
                (*{"${class}::${method}"}{CODE} eq $MRO{$class}->{methods}->{$method}->{code});       
-    }   
+    }
 }
 
 sub calculateMRO {
@@ -190,6 +192,8 @@ sub calculateMRO {
     }, $merge_cache);
 }
 
+# Method overrides to support 5.9.5+ or Class::C3::XS
+
 sub _core_calculateMRO { @{mro::get_linear_isa($_[0])} }
 
 if($C3_IN_CORE) {
@@ -199,6 +203,8 @@ if($C3_IN_CORE) {
 elsif($C3_XS) {
     no warnings 'redefine';
     *Class::C3::calculateMRO = \&Class::C3::XS::calculateMRO;
+    *Class::C3::_calculate_method_dispatch_table
+        = \&Class::C3::XS::_calculate_method_dispatch_table;
 }
 
 1;
@@ -251,7 +257,7 @@ Class::C3 - A pragma to use the C3 method resolution order algortihm
     D->can('hello')->();          # can() also works correctly
     UNIVERSAL::can('D', 'hello'); # as does UNIVERSAL::can()
 
-=head1 SPECIAL NOTE FOR 0.15_05
+=head1 SPECIAL NOTE FOR 0.15_06
 
 To try this with the new perl core c3 support,
 download the most recent copy perl-current:
@@ -260,7 +266,7 @@ http://mirrors.develooper.com/perl/APC/perl-current-snap/
 
 sh Configure -Dusedevel -Dprefix=/where/I/want/it -d -e && make && make test && make install
 
-then try your C3-using software against this perl + Class::C3 0.15_05.
+then try your C3-using software against this perl + Class::C3 0.15_06.
 
 =head1 DESCRIPTION
 
@@ -482,7 +488,7 @@ limitation of this module.
 
 =head1 COMPATIBILITY
 
-If your software requires Perl 5.9.5 or higher, you do not need L<Class::C3>, you can simple C<use mro 'c3'>, and not worry about C<initialize()>, avoid some of the above caveats, and get the best possible performance.  See L<mro> for more details.
+If your software requires Perl 5.9.5 or higher, you do not need L<Class::C3>, you can simply C<use mro 'c3'>, and not worry about C<initialize()>, avoid some of the above caveats, and get the best possible performance.  See L<mro> for more details.
 
 If your software is meant to work on earlier Perls, use L<Class::C3> as documented here.  L<Class::C3> will detect Perl 5.9.5+ and take advantage of the core support when available.
 
