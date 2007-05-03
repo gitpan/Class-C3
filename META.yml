@@ -14,4 +14,7 @@ no_index:
   directory: 
     - inc
     - t
-version: 0.15_06
+requires: 
+  Algorithm::C3: 0.06
+  Scalar::Util: 1.10
+version: 0.16
