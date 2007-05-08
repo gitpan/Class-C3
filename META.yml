@@ -17,4 +17,4 @@ no_index:
 requires: 
   Algorithm::C3: 0.06
   Scalar::Util: 1.10
-version: 0.16
+version: 0.17
