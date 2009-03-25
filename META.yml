@@ -18,10 +18,10 @@ no_index:
 provides:
   Class::C3:
     file: lib/Class/C3.pm
-    version: 0.20
+    version: 0.21
 requires:
   Algorithm::C3: 0.06
   Scalar::Util: 1.10
 resources:
   license: http://dev.perl.org/licenses/
-version: 0.20
+version: 0.21
