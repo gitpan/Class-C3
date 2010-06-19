@@ -8,7 +8,7 @@ build_requires:
 configure_requires:
   ExtUtils::MakeMaker: 6.42
 distribution_type: module
-generated_by: 'Module::Install version 0.91'
+generated_by: 'Module::Install version 0.99'
 license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -18,13 +18,9 @@ no_index:
   directory:
     - inc
     - t
-provides:
-  Class::C3:
-    file: lib/Class/C3.pm
-    version: 0.22
 requires:
   Algorithm::C3: 0.06
   Scalar::Util: 1.10
 resources:
   license: http://dev.perl.org/licenses/
-version: 0.22
+version: 0.23

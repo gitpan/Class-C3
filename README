@@ -53,7 +53,7 @@ DESCRIPTION
 
   What is C3?
     C3 is the name of an algorithm which aims to provide a sane method
-    resolution order under multiple inheritence. It was first introduced in
+    resolution order under multiple inheritance. It was first introduced in
     the langauge Dylan (see links in the "SEE ALSO" section), and then later
     adopted as the prefered MRO (Method Resolution Order) for the new-style
     classes in Python 2.3. Most recently it has been adopted as the
@@ -62,8 +62,8 @@ DESCRIPTION
 
   How does C3 work.
     C3 works by always preserving local precendence ordering. This
-    essentially means that no class will appear before any of it's
-    subclasses. Take the classic diamond inheritence pattern for instance:
+    essentially means that no class will appear before any of its
+    subclasses. Take the classic diamond inheritance pattern for instance:
 
          <A>
         /   \
@@ -159,14 +159,14 @@ METHOD REDISPATCHING
     It is always useful to be able to re-dispatch your method call to the
     "next most applicable method". This module provides a pseudo package
     along the lines of "SUPER::" or "NEXT::" which will re-dispatch the
-    method along the C3 linearization. This is best show with an examples.
+    method along the C3 linearization. This is best shown with an example.
 
       # a classic diamond MI pattern ...
-         <A>
-        /   \
-      <B>   <C>
-        \   /
-         <D>
+      #    <A>
+      #   /   \
+      # <B>   <C>
+      #   \   /
+      #    <D>
 
       package A;
       use c3;
@@ -177,7 +177,7 @@ METHOD REDISPATCHING
       use c3;
       sub foo { 'B::foo => ' . (shift)->next::method() }
 
-      package B;
+      package C;
       use base 'A';
       use c3;
       sub foo { 'C::foo => ' . (shift)->next::method() }
@@ -196,7 +196,8 @@ METHOD REDISPATCHING
     as well).
 
     The next thing to keep in mind is that you will need to pass all
-    arguments to "next::method" it can not automatically use the current @_.
+    arguments to "next::method". It can not automatically use the current
+    @_.
 
     If "next::method" cannot find a next method to re-dispatch the call to,
     it will throw an exception. You can use "next::can" to see if
@@ -221,24 +222,24 @@ CAVEATS
     But there are still caveats, so here goes ...
 
     Use of "SUPER::".
-        The idea of "SUPER::" under multiple inheritence is ambigious, and
-        generally not recomended anyway. However, it's use in conjuntion
-        with this module is very much not recommended, and in fact very
+        The idea of "SUPER::" under multiple inheritance is ambigious, and
+        generally not recomended anyway. However, its use in conjuntion with
+        this module is very much not recommended, and in fact very
         discouraged. The recommended approach is to instead use the supplied
-        "next::method" feature, see more details on it's usage above.
+        "next::method" feature, see more details on its usage above.
 
     Changing @ISA.
         It is the author's opinion that changing @ISA at runtime is pure
         insanity anyway. However, people do it, so I must caveat. Any
         changes to the @ISA will not be reflected in the MRO calculated by
-        this module, and therefor probably won't even show up. If you do
+        this module, and therefore probably won't even show up. If you do
         this, you will need to call "reinitialize" in order to recalulate
         all method dispatch tables. See the "reinitialize" documentation and
         an example in t/20_reinitialize.t for more information.
 
     Adding/deleting methods from class symbol tables.
         This module calculates the MRO for each requested class by
-        interogatting the symbol tables of said classes. So any symbol table
+        interogating the symbol tables of said classes. So any symbol table
         manipulation which takes place after our INIT phase is run will not
         be reflected in the calculated MRO. Just as with changing the @ISA,
         you will need to call "reinitialize" for any changes you make to
