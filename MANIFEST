@@ -35,6 +35,7 @@ t/34_next_method_in_eval.t
 t/35_next_method_in_anon.t
 t/36_next_goto.t
 t/37_mro_warn.t
+t/40_no_xs.t
 t/lib/A.pm
 t/lib/B.pm
 t/lib/C.pm

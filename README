@@ -283,10 +283,10 @@ COMPATIBILITY
 
 Class::C3::XS
     This module will load Class::C3::XS if it's installed and you are
-    running on a Perl version older than 5.9.5. Installing this is
-    recommended when possible, as it results in significant performance
-    improvements (but unlike the 5.9.5+ core support, it still has all of
-    the same caveats as Class::C3).
+    running on a Perl version older than 5.9.5. The optional module will be
+    automatically installed for you if a C compiler is available, as it
+    results in significant performance improvements (but unlike the 5.9.5+
+    core support, it still has all of the same caveats as Class::C3).
 
 CODE COVERAGE
     Devel::Cover was reporting 94.4% overall test coverage earlier in this
