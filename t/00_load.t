@@ -28,7 +28,7 @@ else {
     ok (! $Class::C3::C3_XS, 'Not using XS');
     unless ($INC{'Devel/Hide.pm'}) {
       diag "NO XS speedups - YOUR CODE WILL BE VERY SLOW. Consider installing Class::C3::XS";
-      sleep 3 if -t *STDERR;
+      sleep 3 if -t *STDIN or -t *STDERR;
     }
   }
 }
