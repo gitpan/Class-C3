@@ -45,3 +45,4 @@ t/lib/F.pm
 t/pod.t
 t/pod_coverage.t
 util/visualize_c3.pl
+META.json                                Module JSON meta-data (added by MakeMaker)

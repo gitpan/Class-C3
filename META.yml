@@ -1,16 +1,13 @@
 ---
-abstract: 'A pragma to use the C3 method resolution order algortihm'
+abstract: 'A pragma to use the C3 method resolution order algorithm'
 author:
   - 'Stevan Little, <stevan@iinteractive.com>'
 build_requires:
-  ExtUtils::MakeMaker: 6.59
   Test::More: 0.47
 configure_requires:
   ExtUtils::CBuilder: 0.27
-  ExtUtils::MakeMaker: 6.59
-distribution_type: module
 dynamic_config: 1
-generated_by: 'Module::Install version 1.06'
+generated_by: 'ExtUtils::MakeMaker version 6.68, CPAN::Meta::Converter version 2.131560'
 license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -18,12 +15,13 @@ meta-spec:
 name: Class-C3
 no_index:
   directory:
-    - inc
     - t
+    - inc
 requires:
   Algorithm::C3: 0.07
   Scalar::Util: 0
-  perl: 5.6.2
 resources:
-  license: http://dev.perl.org/licenses/
-version: 0.24
+  bugtracker: http://rt.cpan.org/Public/Dist/Display.html?Name=Class-C3
+  homepage: http://search.cpan.org/dist/Class-C3
+  repository: git://git.shadowcat.co.uk/gitmo/Class-C3.git
+version: 0.25
