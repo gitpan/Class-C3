@@ -3,22 +3,22 @@ NAME
 
 SYNOPSIS
         # NOTE - DO NOT USE Class::C3 directly as a user, use MRO::Compat instead!
-        package A;
+        package ClassA;
         use Class::C3;
         sub hello { 'A::hello' }
 
-        package B;
-        use base 'A';
+        package ClassB;
+        use base 'ClassA';
         use Class::C3;
 
-        package C;
-        use base 'A';
+        package ClassC;
+        use base 'ClassA';
         use Class::C3;
 
         sub hello { 'C::hello' }
 
-        package D;
-        use base ('B', 'C');
+        package ClassD;
+        use base ('ClassB', 'ClassC');
         use Class::C3;
 
         # Classic Diamond MI pattern
@@ -34,12 +34,12 @@ SYNOPSIS
         # (formerly called in INIT)
         Class::C3::initialize();
 
-        print join ', ' => Class::C3::calculateMRO('Diamond_D') # prints D, B, C, A
+        print join ', ' => Class::C3::calculateMRO('ClassD'); # prints ClassD, ClassB, ClassC, ClassA
 
-        print D->hello() # prints 'C::hello' instead of the standard p5 'A::hello'
+        print ClassD->hello(); # prints 'C::hello' instead of the standard p5 'A::hello'
 
-        D->can('hello')->();          # can() also works correctly
-        UNIVERSAL::can('D', 'hello'); # as does UNIVERSAL::can()
+        ClassD->can('hello')->();          # can() also works correctly
+        UNIVERSAL::can('ClassD', 'hello'); # as does UNIVERSAL::can()
 
 DESCRIPTION
     This is pragma to change Perl 5's standard method resolution order from
@@ -54,7 +54,7 @@ DESCRIPTION
   What is C3?
     C3 is the name of an algorithm which aims to provide a sane method
     resolution order under multiple inheritance. It was first introduced in
-    the langauge Dylan (see links in the "SEE ALSO" section), and then later
+    the language Dylan (see links in the "SEE ALSO" section), and then later
     adopted as the preferred MRO (Method Resolution Order) for the new-style
     classes in Python 2.3. Most recently it has been adopted as the
     'canonical' MRO for Perl 6 classes, and the default MRO for Parrot
@@ -76,8 +76,8 @@ DESCRIPTION
     algorithm however, produces the following MRO (D, B, C, A), which does
     not have this same issue.
 
-    This example is fairly trival, for more complex examples and a deeper
-    explaination, see the links in the "SEE ALSO" section.
+    This example is fairly trivial, for more complex examples and a deeper
+    explanation, see the links in the "SEE ALSO" section.
 
   How does this module work?
     This module uses a technique similar to Perl 5's method caching. When
@@ -102,12 +102,12 @@ OPTIONAL LOWERCASE PRAGMA
       package MyClass;
       use c3;
 
-    The the more clunky:
+    This is more clunky:
 
       package MyClass;
       use Class::C3;
 
-    But hey, it's your choice, thats why it is optional.
+    But hey, it's your choice, that's why it is optional.
 
 FUNCTIONS
     calculateMRO ($class)
@@ -137,8 +137,8 @@ FUNCTIONS
         phase of the perl compiler, but that lead to warnings if this module
         was required at runtime. After discussion with my user base (the
         DBIx::Class folks), we decided that calling this in INIT was more of
-        an annoyance than a convience. I apologize to anyone this causes
-        problems for (although i would very suprised if I had any other
+        an annoyance than a convenience. I apologize to anyone this causes
+        problems for (although I would be very surprised if I had any other
         users other than the DBIx::Class folks). The simplest solution of
         course is to define your own INIT method which calls this function.
 
@@ -223,8 +223,8 @@ CAVEATS
 
     Use of "SUPER::".
         The idea of "SUPER::" under multiple inheritance is ambiguous, and
-        generally not recomended anyway. However, its use in conjuntion with
-        this module is very much not recommended, and in fact very
+        generally not recommended anyway. However, its use in conjunction
+        with this module is very much not recommended, and in fact very
         discouraged. The recommended approach is to instead use the supplied
         "next::method" feature, see more details on its usage above.
 
@@ -233,13 +233,13 @@ CAVEATS
         insanity anyway. However, people do it, so I must caveat. Any
         changes to the @ISA will not be reflected in the MRO calculated by
         this module, and therefore probably won't even show up. If you do
-        this, you will need to call "reinitialize" in order to recalulate
+        this, you will need to call "reinitialize" in order to recalculate
         all method dispatch tables. See the "reinitialize" documentation and
         an example in t/20_reinitialize.t for more information.
 
     Adding/deleting methods from class symbol tables.
         This module calculates the MRO for each requested class by
-        interogating the symbol tables of said classes. So any symbol table
+        interrogating the symbol tables of said classes. So any symbol table
         manipulation which takes place after our INIT phase is run will not
         be reflected in the calculated MRO. Just as with changing the @ISA,
         you will need to call "reinitialize" for any changes you make to
